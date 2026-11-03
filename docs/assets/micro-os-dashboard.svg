@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 620" role="img" aria-labelledby="title desc">
+  <title id="title">Micro-OS kernel dashboard</title>
+  <desc id="desc">A dark terminal-inspired dashboard showing boot status, kernel subsystems, and three scheduler task bars.</desc>
+  <rect width="1200" height="620" rx="24" fill="#0a1220"/>
+  <rect x="28" y="28" width="1144" height="72" rx="14" fill="#14243b"/>
+  <circle cx="62" cy="64" r="10" fill="#ff6b6b"/><circle cx="94" cy="64" r="10" fill="#ffd166"/><circle cx="126" cy="64" r="10" fill="#80ed99"/>
+  <text x="170" y="73" fill="#bfe9ff" font-family="monospace" font-size="28" font-weight="700">MICRO-OS // KERNEL CONSOLE</text>
+  <text x="54" y="142" fill="#80ed99" font-family="monospace" font-size="20">BOOT STATUS: ONLINE</text>
+  <text x="54" y="174" fill="#93a9c2" font-family="monospace" font-size="18">x86_64  |  no_std  |  QEMU BIOS  |  PIT 20 Hz</text>
+  <rect x="42" y="206" width="1116" height="2" fill="#243b5a"/>
+  <text x="54" y="248" fill="#d8e7f5" font-family="monospace" font-size="22" font-weight="700">ROUND ROBIN SCHEDULER</text>
+  <text x="54" y="278" fill="#8299b2" font-family="monospace" font-size="17">LIVE TASK QUANTUM / READY QUEUE</text>
+  <text x="54" y="330" fill="#ffcf70" font-family="monospace" font-size="20">TASK 1  SHELL</text>
+  <rect x="54" y="348" width="310" height="28" rx="7" fill="#1d304b"/><rect x="54" y="348" width="228" height="28" rx="7" fill="#ffbe5c"/>
+  <text x="414" y="370" fill="#ffbe5c" font-family="monospace" font-size="18">READY</text>
+  <text x="54" y="424" fill="#9af0b2" font-family="monospace" font-size="20">TASK 2  LOGGER</text>
+  <rect x="54" y="442" width="310" height="28" rx="7" fill="#1d304b"/><rect x="54" y="442" width="190" height="28" rx="7" fill="#82e69c"/>
+  <text x="414" y="464" fill="#82e69c" font-family="monospace" font-size="18">TERMINATED</text>
+  <text x="700" y="330" fill="#d1a7ff" font-family="monospace" font-size="20">TASK 3  WORKER</text>
+  <rect x="700" y="348" width="310" height="28" rx="7" fill="#1d304b"/><rect x="700" y="348" width="274" height="28" rx="7" fill="#c39aff"/>
+  <text x="700" y="424" fill="#93a9c2" font-family="monospace" font-size="18">IDT + PIC + PIT: READY</text>
+  <text x="700" y="458" fill="#93a9c2" font-family="monospace" font-size="18">BUMP HEAP: 128 / 65536 B</text>
+  <text x="700" y="492" fill="#80ed99" font-family="monospace" font-size="18">SWITCHES: 9   COMPLETED: 3</text>
+  <rect x="42" y="548" width="1116" height="2" fill="#243b5a"/>
+  <text x="54" y="586" fill="#5f7894" font-family="monospace" font-size="16">BUILD THE MECHANISM // BOOT THE KERNEL // READ THE EVIDENCE</text>
+</svg>
