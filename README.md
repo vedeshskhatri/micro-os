@@ -175,3 +175,4 @@ AI assistance was used for scaffolding, debugging hypotheses, and documentation.
 ## License
 
 This project is intended for educational use and coursework demonstration.
+# micro-os
