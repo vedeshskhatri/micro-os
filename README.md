@@ -84,6 +84,7 @@ micro-os/
 ├── tests/kernel_mechanisms.rs
 ├── build.rs                 # kernel artifact -> BIOS image
 ├── scripts/run_qemu.ps1    # boot helper
+├── scripts/run_qemu_window.ps1 # graphical QEMU window
 ├── scripts/analyze_trace.py
 ├── docs/architecture.md
 ├── docs/testing.md
@@ -118,6 +119,14 @@ cargo build
 ```
 
 The build creates `target/micro-os-bios.img`. The QEMU helper connects the kernel UART to the terminal and exits automatically after the integrated run completes.
+
+To see the kernel dashboard in an actual QEMU window:
+
+```powershell
+.\scripts\run_qemu_window.ps1
+```
+
+The window shows the Micro-OS title, boot status, timer/PIC/PIT status, memory status, and three live task progress bars. Close the QEMU window after the final task reaches completion.
 
 On Linux or macOS, use the same Cargo commands and ensure `qemu-system-x86_64` is on `PATH`.
 
@@ -175,4 +184,3 @@ AI assistance was used for scaffolding, debugging hypotheses, and documentation.
 ## License
 
 This project is intended for educational use and coursework demonstration.
-# micro-os

@@ -2,7 +2,7 @@
 #![no_main]
 #![feature(abi_x86_interrupt)]
 
-use bootloader_api::{entry_point, BootInfo};
+use bootloader_api::{entry_point, info::FrameBufferInfo, info::PixelFormat, BootInfo};
 use core::alloc::{GlobalAlloc, Layout};
 use core::fmt::{self, Write};
 use core::panic::PanicInfo;
@@ -36,6 +36,143 @@ lazy_static! {
 
 static PICS: Mutex<ChainedPics> =
     Mutex::new(unsafe { ChainedPics::new(PIC_1_OFFSET, PIC_2_OFFSET) });
+
+struct Screen {
+    buffer: *mut u8,
+    info: Option<FrameBufferInfo>,
+    active_task: usize,
+    completed: [bool; 3],
+}
+
+unsafe impl Sync for Screen {}
+unsafe impl Send for Screen {}
+
+impl Screen {
+    const fn new() -> Self {
+        Self {
+            buffer: core::ptr::null_mut(),
+            info: None,
+            active_task: 0,
+            completed: [false; 3],
+        }
+    }
+
+    fn init(&mut self, framebuffer: &mut bootloader_api::info::FrameBuffer) {
+        let info = framebuffer.info();
+        self.buffer = framebuffer.buffer_mut().as_mut_ptr();
+        self.info = Some(info);
+        self.fill([10, 18, 32]);
+        self.rect(0, 0, info.width, 72, [20, 32, 54]);
+        self.text(40, 22, "MICRO-OS", 3, [120, 220, 255]);
+        self.text(40, 112, "RUST KERNEL ONLINE", 2, [220, 230, 240]);
+        self.text(40, 158, "ROUND ROBIN SCHEDULER", 2, [170, 190, 210]);
+        self.text(40, 224, "TASK 1", 2, [255, 190, 90]);
+        self.text(340, 224, "TASK 2", 2, [130, 230, 150]);
+        self.text(640, 224, "TASK 3", 2, [190, 150, 255]);
+        self.rect(40, 270, 240, 26, [44, 64, 86]);
+        self.rect(340, 270, 240, 26, [44, 64, 86]);
+        self.rect(640, 270, 240, 26, [44, 64, 86]);
+        self.text(40, 360, "TIMER 20 HZ", 2, [140, 180, 200]);
+        self.text(40, 402, "IDT + PIC + PIT READY", 2, [140, 180, 200]);
+        self.text(40, 444, "MEMORY 64K BUMP HEAP", 2, [140, 180, 200]);
+    }
+
+    fn schedule(&mut self, task_id: usize, finished: bool) {
+        self.active_task = task_id;
+        if finished && (1..=3).contains(&task_id) {
+            self.completed[task_id - 1] = true;
+        }
+        let colors = [[255, 190, 90], [130, 230, 150], [190, 150, 255]];
+        for (index, color) in colors.iter().enumerate() {
+            let x = 40 + index * 300;
+            let fill = if self.completed[index] {
+                240
+            } else if self.active_task == index + 1 {
+                180
+            } else {
+                40
+            };
+            self.rect(x, 270, fill, 26, *color);
+        }
+    }
+
+    fn fill(&mut self, color: [u8; 3]) {
+        if let Some(info) = self.info {
+            self.rect(0, 0, info.width, info.height, color);
+        }
+    }
+
+    fn rect(&mut self, x: usize, y: usize, width: usize, height: usize, color: [u8; 3]) {
+        let Some(info) = self.info else { return };
+        let max_x = (x + width).min(info.width);
+        let max_y = (y + height).min(info.height);
+        for row in y.min(info.height)..max_y {
+            for column in x.min(info.width)..max_x {
+                self.pixel(column, row, color);
+            }
+        }
+    }
+
+    fn text(&mut self, x: usize, y: usize, text: &str, scale: usize, color: [u8; 3]) {
+        for (index, character) in text.bytes().enumerate() {
+            self.character(x + index * 6 * scale, y, character, scale, color);
+        }
+    }
+
+    fn character(&mut self, x: usize, y: usize, character: u8, scale: usize, color: [u8; 3]) {
+        let glyph = match character {
+            b'A' => [0x0e, 0x11, 0x11, 0x1f, 0x11, 0x11, 0x11],
+            b'C' => [0x0f, 0x10, 0x10, 0x10, 0x10, 0x10, 0x0f],
+            b'D' => [0x1e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x1e],
+            b'E' => [0x1f, 0x10, 0x10, 0x1e, 0x10, 0x10, 0x1f],
+            b'I' => [0x1f, 0x04, 0x04, 0x04, 0x04, 0x04, 0x1f],
+            b'K' => [0x11, 0x12, 0x14, 0x18, 0x14, 0x12, 0x11],
+            b'L' => [0x10, 0x10, 0x10, 0x10, 0x10, 0x10, 0x1f],
+            b'M' => [0x11, 0x1b, 0x15, 0x15, 0x11, 0x11, 0x11],
+            b'N' => [0x11, 0x19, 0x15, 0x13, 0x11, 0x11, 0x11],
+            b'O' => [0x0e, 0x11, 0x11, 0x11, 0x11, 0x11, 0x0e],
+            b'P' => [0x1e, 0x11, 0x11, 0x1e, 0x10, 0x10, 0x10],
+            b'R' => [0x1e, 0x11, 0x11, 0x1e, 0x14, 0x12, 0x11],
+            b'S' => [0x0f, 0x10, 0x10, 0x0e, 0x01, 0x01, 0x1e],
+            b'T' => [0x1f, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04],
+            b'Y' => [0x11, 0x11, 0x0a, 0x04, 0x04, 0x04, 0x04],
+            b'0' => [0x0e, 0x11, 0x13, 0x15, 0x19, 0x11, 0x0e],
+            b'1' => [0x04, 0x0c, 0x04, 0x04, 0x04, 0x04, 0x1f],
+            b'2' => [0x0e, 0x11, 0x01, 0x02, 0x04, 0x08, 0x1f],
+            b'3' => [0x1e, 0x01, 0x01, 0x0e, 0x01, 0x01, 0x1e],
+            b' ' => [0; 7],
+            b'+' => [0x04, 0x04, 0x1f, 0x04, 0x04, 0, 0],
+            _ => [0; 7],
+        };
+        for (row, bits) in glyph.iter().enumerate() {
+            for column in 0..5 {
+                if bits & (1 << (4 - column)) != 0 {
+                    self.rect(x + column * scale, y + row * scale, scale, scale, color);
+                }
+            }
+        }
+    }
+
+    fn pixel(&mut self, x: usize, y: usize, color: [u8; 3]) {
+        let Some(info) = self.info else { return };
+        let offset = (y * info.stride + x) * info.bytes_per_pixel;
+        unsafe {
+            let destination =
+                core::slice::from_raw_parts_mut(self.buffer.add(offset), info.bytes_per_pixel);
+            match info.pixel_format {
+                PixelFormat::Rgb => destination[..3].copy_from_slice(&color),
+                PixelFormat::Bgr => {
+                    destination[..3].copy_from_slice(&[color[2], color[1], color[0]])
+                }
+                PixelFormat::U8 => destination[0] = color[0],
+                PixelFormat::Unknown { .. } => destination[..3].copy_from_slice(&color),
+                _ => destination[..3].copy_from_slice(&color),
+            }
+        }
+    }
+}
+
+static SCREEN: Mutex<Screen> = Mutex::new(Screen::new());
 
 #[derive(Clone, Copy, Eq, PartialEq)]
 enum TaskState {
@@ -182,10 +319,14 @@ impl InterruptIndex {
     }
 }
 
-fn kernel_main(_boot_info: &'static mut BootInfo) -> ! {
+fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     serial_println!("Micro-OS Rust kernel booted");
     serial_println!("[BOOT] x86_64 bootloader transferred control to kernel");
     serial_println!("[INIT] serial console initialized");
+
+    if let Some(framebuffer) = boot_info.framebuffer.as_mut() {
+        SCREEN.lock().init(framebuffer);
+    }
 
     IDT.load();
     unsafe { PICS.lock().initialize() };
@@ -238,6 +379,7 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
             task.name,
             if finished { " TERMINATED" } else { "" }
         );
+        SCREEN.lock().schedule(task.id, finished);
         if queue.is_empty() {
             serial_println!(
                 "[DONE] switches={} completed_tasks={}",
