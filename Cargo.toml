@@ -1,0 +1,30 @@
+[package]
+name = "micro-os"
+version = "0.1.0"
+edition = "2021"
+build = "build.rs"
+
+[workspace]
+members = ["kernel"]
+resolver = "3"
+
+[lib]
+name = "micro_os"
+path = "src/lib.rs"
+
+[[bin]]
+name = "micro-os-demo"
+path = "src/main.rs"
+
+[dependencies]
+
+[build-dependencies]
+bootloader = "0.11.17"
+kernel = { package = "micro-os-kernel", path = "kernel", artifact = "bin", target = "x86_64-unknown-none" }
+
+[profile.release]
+debug = true
+panic = "abort"
+
+[profile.dev]
+panic = "abort"

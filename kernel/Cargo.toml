@@ -1,0 +1,13 @@
+[package]
+name = "micro-os-kernel"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bootloader_api = "0.11.17"
+lazy_static = { version = "1.5.0", features = ["spin_no_std"] }
+pic8259 = "0.11.0"
+spin = "0.9.8"
+uart_16550 = "0.3.2"
+x86_64 = { version = "0.15.5", features = ["abi_x86_interrupt"] }
+
