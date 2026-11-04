@@ -23,7 +23,7 @@ Micro-OS is an educational x86_64 operating system built for the CA-6 Rust Micro
 | | Result |
 | --- | --- |
 | Kernel | Rust `no_std` x86_64 kernel |
-| Boot path | BIOS bootloader -> QEMU -> kernel entry |
+| Boot path | BIOS disk image or UEFI El Torito ISO -> QEMU -> kernel entry |
 | Scheduler | Timer-driven Round Robin |
 | Timer | PIT at 20 Hz, remapped PIC, IDT handler |
 | Memory | 64 KiB monotonic bump heap |
@@ -119,6 +119,7 @@ micro-os/
 │   └── timer.rs                # host timer model
 ├── tests/kernel_mechanisms.rs
 ├── build.rs                    # kernel artifact -> BIOS image
+├── dist/micro-os.iso           # ready-to-boot UEFI ISO
 ├── scripts/run_qemu.ps1       # headless boot helper
 ├── scripts/run_qemu_window.ps1 # graphical QEMU window
 ├── scripts/analyze_trace.py
@@ -156,7 +157,7 @@ cargo build
 ./scripts/run_qemu.ps1
 ```
 
-The build creates `target/micro-os-bios.img`. The headless QEMU helper connects the kernel UART to the terminal and exits automatically after the integrated run completes.
+The build creates `target/micro-os-bios.img` and `target/micro-os.iso`. The ISO is also copied to [`dist/micro-os.iso`](dist/micro-os.iso), a ready-to-boot UEFI El Torito image suitable for mounting as a virtual CD/DVD. The headless QEMU helper connects the kernel UART to the terminal and exits automatically after the integrated run completes.
 
 To see the kernel dashboard in an actual QEMU window:
 
@@ -176,6 +177,7 @@ On Linux or macOS, use the same Cargo commands and ensure `qemu-system-x86_64` i
 | `cargo build` | Compile the kernel and create `target/micro-os-bios.img` |
 | `./scripts/run_qemu.ps1` | Boot headlessly and print the serial trace |
 | `./scripts/run_qemu_window.ps1` | Open the graphical framebuffer dashboard |
+| `./scripts/run_qemu_iso.ps1` | Boot the real UEFI ISO and print the serial trace |
 | `python scripts/analyze_trace.py traces/qemu-boot.log` | Calculate scheduler metrics |
 | `cargo fmt --all` | Format all Rust crates |
 | `git status` | Check local changes before submission |
@@ -229,11 +231,20 @@ cargo test
 | Diagnostics | Serial and framebuffer output | Save `traces/qemu-boot.log` |
 | Validation | Rust tests and Python analyzer | `cargo test` plus metrics |
 
+## Boot The ISO
+
+```powershell
+./scripts/run_qemu_iso.ps1
+```
+
+The ISO uses the bootloader-generated UEFI FAT payload and QEMU UEFI firmware. On a physical or virtual machine, attach `target/micro-os.iso` as a CD/DVD image and boot in UEFI mode.
+
 ## Evidence Checklist
 
 Before submission, collect:
 
 - [ ] A screenshot of the graphical QEMU dashboard
+- [ ] `target/micro-os.iso` tested as a UEFI CD/DVD image
 - [ ] `traces/qemu-boot.log` from a fresh run
 - [ ] Passing `cargo test` output
 - [ ] Scheduler order and task completion evidence

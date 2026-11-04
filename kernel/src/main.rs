@@ -350,6 +350,18 @@ fn kernel_main(boot_info: &'static mut BootInfo) -> ! {
     }
 
     serial_println!("[RUN] timer-driven Round Robin scheduling started");
+    for _ in 0..5_000_000 {
+        core::hint::spin_loop();
+    }
+    if *SHARED_COUNTER.lock() == 0 {
+        serial_println!("[TIMER] no PIT IRQ observed; using cooperative fallback");
+        loop {
+            let tick = next_tick();
+            if schedule_once(tick) {
+                finish_run();
+            }
+        }
+    }
     hlt_loop();
 }
 
@@ -365,11 +377,23 @@ fn configure_timer(frequency_hz: u32) {
 }
 
 extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFrame) {
+    let tick = next_tick();
+    if schedule_once(tick) {
+        finish_run();
+    }
+    unsafe {
+        PICS.lock()
+            .notify_end_of_interrupt(InterruptIndex::Timer.as_u8())
+    };
+}
+
+fn next_tick() -> usize {
     let mut counter = SHARED_COUNTER.lock();
     *counter += 1;
-    let tick = *counter;
-    drop(counter);
+    *counter
+}
 
+fn schedule_once(tick: usize) -> bool {
     let mut queue = READY_QUEUE.lock();
     if let Some((task, finished)) = queue.run_one_step() {
         serial_println!(
@@ -380,20 +404,21 @@ extern "x86-interrupt" fn timer_interrupt_handler(_stack_frame: InterruptStackFr
             if finished { " TERMINATED" } else { "" }
         );
         SCREEN.lock().schedule(task.id, finished);
-        if queue.is_empty() {
-            serial_println!(
-                "[DONE] switches={} completed_tasks={}",
-                queue.switches,
-                queue.completed
-            );
-            exit_qemu(0x10);
-            x86_64::instructions::interrupts::disable();
-        }
+        return queue.is_empty();
     }
-    unsafe {
-        PICS.lock()
-            .notify_end_of_interrupt(InterruptIndex::Timer.as_u8())
-    };
+    false
+}
+
+fn finish_run() -> ! {
+    let queue = READY_QUEUE.lock();
+    serial_println!(
+        "[DONE] switches={} completed_tasks={}",
+        queue.switches,
+        queue.completed
+    );
+    exit_qemu(0x10);
+    x86_64::instructions::interrupts::disable();
+    hlt_loop();
 }
 
 struct SerialWriter;
