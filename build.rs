@@ -95,7 +95,7 @@ fn create_uefi_iso(uefi_partition: &Path, iso: &Path) -> std::io::Result<()> {
 
     let catalog = BOOT_CATALOG_BLOCK * BLOCK_SIZE;
     image[catalog] = 1;
-    image[catalog + 1] = 0;
+    image[catalog + 1] = 0xef;
     copy_padded(
         &mut image[catalog + 4..catalog + 28],
         b"MICRO-OS UEFI BOOT",
@@ -114,7 +114,16 @@ fn create_uefi_iso(uefi_partition: &Path, iso: &Path) -> std::io::Result<()> {
     let checksum = checksum.wrapping_neg();
     image[catalog + 28..catalog + 30].copy_from_slice(&checksum.to_le_bytes());
 
-    let section = catalog + 32;
+    let sector_count = ((boot_image.len() / 512) as u16).to_le_bytes();
+    let lba = (BOOT_IMAGE_BLOCK as u32).to_le_bytes();
+
+    let default_entry = catalog + 32;
+    image[default_entry] = 0x88;
+    image[default_entry + 1] = 0x00;
+    image[default_entry + 6..default_entry + 8].copy_from_slice(&sector_count);
+    image[default_entry + 8..default_entry + 12].copy_from_slice(&lba);
+
+    let section = catalog + 64;
     image[section] = 0x91;
     image[section + 1] = 0xef;
     image[section + 2..section + 4].copy_from_slice(&1u16.to_le_bytes());
@@ -124,12 +133,22 @@ fn create_uefi_iso(uefi_partition: &Path, iso: &Path) -> std::io::Result<()> {
         b' ',
     );
 
-    let entry = catalog + 64;
+    let entry = catalog + 96;
     image[entry] = 0x88;
-    image[entry + 6..entry + 8].copy_from_slice(&((boot_image.len() / 512) as u16).to_le_bytes());
-    write_u32_le(&mut image, entry + 8, BOOT_IMAGE_BLOCK as u32);
+    image[entry + 1] = 0x00;
+    image[entry + 6..entry + 8].copy_from_slice(&sector_count);
+    image[entry + 8..entry + 12].copy_from_slice(&lba);
 
-    fs::write(iso, image)
+    fs::write(iso, &image)?;
+    let dist_dir = Path::new("dist");
+    if dist_dir.exists() {
+        let _ = fs::write(dist_dir.join("micro-os.iso"), &image);
+    }
+    let root_iso = Path::new("micro-os.iso");
+    if root_iso.exists() {
+        let _ = fs::write(root_iso, &image);
+    }
+    Ok(())
 }
 
 fn copy_padded(destination: &mut [u8], source: &[u8], padding: u8) {
