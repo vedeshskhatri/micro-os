@@ -33,12 +33,13 @@ fn main() {
 fn create_uefi_iso(uefi_partition: &Path, iso: &Path) -> std::io::Result<()> {
     const BLOCK_SIZE: usize = 2048;
     const BOOT_CATALOG_BLOCK: usize = 19;
-    const BOOT_IMAGE_BLOCK: usize = 20;
+    const ROOT_DIRECTORY_BLOCK: usize = 20;
+    const PATH_TABLE_BLOCK: usize = 21;
+    const BOOT_IMAGE_BLOCK: usize = 22;
 
     let boot_image = fs::read(uefi_partition)?;
     let boot_image_blocks = boot_image.len().div_ceil(BLOCK_SIZE);
-    let root_directory_block = BOOT_IMAGE_BLOCK + boot_image_blocks;
-    let image_blocks = root_directory_block + 1;
+    let image_blocks = BOOT_IMAGE_BLOCK + boot_image_blocks;
     let mut image = vec![0; image_blocks * BLOCK_SIZE];
     let boot_start = BOOT_IMAGE_BLOCK * BLOCK_SIZE;
     image[boot_start..boot_start + boot_image.len()].copy_from_slice(&boot_image);
@@ -57,59 +58,28 @@ fn create_uefi_iso(uefi_partition: &Path, iso: &Path) -> std::io::Result<()> {
     set_both_u16(&mut image, primary + 120, 1);
     set_both_u16(&mut image, primary + 124, 1);
     set_both_u16(&mut image, primary + 128, BLOCK_SIZE as u16);
+    set_both_u32(&mut image, primary + 132, 10);
+    write_u32_le(&mut image, primary + 140, PATH_TABLE_BLOCK as u32);
+    image[primary + 144..primary + 148].fill(0);
+    image[primary + 148..primary + 152].copy_from_slice(&(PATH_TABLE_BLOCK as u32).to_be_bytes());
+    image[primary + 152..primary + 156].fill(0);
     image[primary + 156] = 34;
-    set_both_u32(&mut image, primary + 158, root_directory_block as u32);
+    set_both_u32(&mut image, primary + 158, ROOT_DIRECTORY_BLOCK as u32);
     set_both_u32(&mut image, primary + 166, BLOCK_SIZE as u32);
     image[primary + 190] = 1;
     image[primary + 191] = 0;
-    image[primary + 192] = 0;
-    image[primary + 193] = 0;
-    image[primary + 194] = 0;
-    image[primary + 195] = 0;
-    image[primary + 196] = 0;
-    image[primary + 197] = 0;
-    image[primary + 198] = 0;
-    image[primary + 199] = 0;
-    image[primary + 200] = 0;
-    image[primary + 201] = 0;
-    image[primary + 202] = 0;
-    image[primary + 203] = 0;
-    image[primary + 204] = 0;
-    image[primary + 205] = 0;
-    image[primary + 206] = 0;
-    image[primary + 207] = 0;
-    image[primary + 208] = 0;
-    image[primary + 209] = 0;
-    image[primary + 210] = 0;
-    image[primary + 211] = 0;
-    image[primary + 212] = 0;
-    image[primary + 213] = 0;
-    image[primary + 214] = 0;
-    image[primary + 215] = 0;
-    image[primary + 216] = 0;
-    image[primary + 217] = 0;
-    image[primary + 218] = 0;
-    image[primary + 219] = 0;
-    image[primary + 220] = 0;
-    image[primary + 221] = 0;
-    image[primary + 222] = 0;
-    image[primary + 223] = 0;
-    image[primary + 224] = 0;
-    image[primary + 225] = 0;
-    image[primary + 226] = 0;
-    image[primary + 227] = 0;
-    image[primary + 228] = 0;
-    image[primary + 229] = 0;
-    image[primary + 230] = 0;
-    image[primary + 231] = 0;
-    image[primary + 232] = 0;
-    image[primary + 233] = 0;
-    image[primary + 234] = 0;
-    image[primary + 235] = 0;
-    image[primary + 236] = 0;
-    image[primary + 237] = 0;
-    image[primary + 238] = 0;
-    image[primary + 239] = 0;
+
+    let root = ROOT_DIRECTORY_BLOCK * BLOCK_SIZE;
+    directory_record(&mut image, root, ROOT_DIRECTORY_BLOCK as u32, 0);
+    directory_record(&mut image, root + 34, ROOT_DIRECTORY_BLOCK as u32, 1);
+
+    let path_table = PATH_TABLE_BLOCK * BLOCK_SIZE;
+    image[path_table] = 1;
+    image[path_table + 1] = 0;
+    image[path_table + 2..path_table + 6]
+        .copy_from_slice(&(ROOT_DIRECTORY_BLOCK as u32).to_le_bytes());
+    image[path_table + 6..path_table + 8].copy_from_slice(&1u16.to_le_bytes());
+    image[path_table + 8] = 0;
 
     let boot_record = 17 * BLOCK_SIZE;
     image[boot_record + 1..boot_record + 6].copy_from_slice(b"CD001");
@@ -167,6 +137,16 @@ fn create_uefi_iso(uefi_partition: &Path, iso: &Path) -> std::io::Result<()> {
 fn copy_padded(destination: &mut [u8], source: &[u8], padding: u8) {
     destination.fill(padding);
     destination[..source.len()].copy_from_slice(source);
+}
+
+fn directory_record(image: &mut [u8], offset: usize, extent: u32, identifier: u8) {
+    image[offset] = 34;
+    set_both_u32(image, offset + 2, extent);
+    set_both_u32(image, offset + 10, 2048);
+    image[offset + 25] = 2;
+    set_both_u16(image, offset + 28, 1);
+    image[offset + 32] = 1;
+    image[offset + 33] = identifier;
 }
 
 fn write_u32_le(buffer: &mut [u8], offset: usize, value: u32) {
