@@ -75,11 +75,9 @@ fn create_uefi_iso(uefi_partition: &Path, iso: &Path) -> std::io::Result<()> {
 
     let path_table = PATH_TABLE_BLOCK * BLOCK_SIZE;
     image[path_table] = 1;
-    image[path_table + 1] = 0;
     image[path_table + 2..path_table + 6]
         .copy_from_slice(&(ROOT_DIRECTORY_BLOCK as u32).to_le_bytes());
     image[path_table + 6..path_table + 8].copy_from_slice(&1u16.to_le_bytes());
-    image[path_table + 8] = 0;
 
     let boot_record = 17 * BLOCK_SIZE;
     image[boot_record + 1..boot_record + 6].copy_from_slice(b"CD001");
